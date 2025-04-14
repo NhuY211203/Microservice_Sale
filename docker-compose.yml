@@ -1,0 +1,113 @@
+version: '3'
+
+services:
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - PORT=8000
+      - PRODUCT_SERVICE_URL=http://product-service:8001
+      - ORDER_SERVICE_URL=http://order-service:8002
+      - CUSTOMER_SERVICE_URL=http://customer-service:8003
+    depends_on:
+      - product-service
+      - order-service
+      - customer-service
+
+  # Product Service
+  product-service:
+    build: ./product-service
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=development
+      - PORT=8001
+      - DB_URI=mongodb://mongo-product:27017/product-service
+      - KAFKA_BROKER=kafka:9092
+    depends_on:
+      - mongo-product
+      - kafka
+      - zookeeper
+
+  # Order Service
+  order-service:
+    build: ./order-service
+    ports:
+      - "8002:8002"
+    environment:
+      - NODE_ENV=development
+      - PORT=8002
+      - DB_URI=mongodb://mongo-order:27017/order-service
+      - KAFKA_BROKER=kafka:9092
+      - PRODUCT_SERVICE_URL=http://product-service:8001
+      - CUSTOMER_SERVICE_URL=http://customer-service:8003
+    depends_on:
+      - mongo-order
+      - kafka
+      - zookeeper
+      - product-service
+      - customer-service
+
+  # Customer Service
+  customer-service:
+    build: ./customer-service
+    ports:
+      - "8003:8003"
+    environment:
+      - NODE_ENV=development
+      - PORT=8003
+      - DB_URI=mongodb://mongo-customer:27017/customer-service
+      - KAFKA_BROKER=kafka:9092
+    depends_on:
+      - mongo-customer
+      - kafka
+      - zookeeper
+
+  # MongoDB for Product Service
+  mongo-product:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-product-data:/data/db
+
+  # MongoDB for Order Service
+  mongo-order:
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-order-data:/data/db
+
+  # MongoDB for Customer Service
+  mongo-customer:
+    image: mongo:latest
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongo-customer-data:/data/db
+
+  # Kafka
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "order-created:1:1,product-updated:1:1"
+    depends_on:
+      - zookeeper
+
+volumes:
+  mongo-product-data:
+  mongo-order-data:
+  mongo-customer-data:
